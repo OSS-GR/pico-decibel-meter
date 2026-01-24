@@ -69,14 +69,19 @@ class DBMeter():
         
         return data
     
-    def get_current_db(self):
+    def read_sound_level(self):
         """
-        Docstring for get_current_db
-        
-        :param self: Description
+        Read the current sound level in decibels (dB SPL) from the meter.
+
+        :return: Current sound level as integer
         """
-        data = self.reg_read(self.PCBARTISTS_DBM, self.I2C_REG_DECIBEL)
-        return int.from_bytes(data, "big")
+        try:
+            data = self.reg_read(self.PCBARTISTS_DBM, self.I2C_REG_DECIBEL)
+            return int.from_bytes(data, "big")
+        except Exception as e:
+            print("Failed to read decibel meter recording")
+            print(e)
+            return 0
 ###############################################
 # Main
 if __name__=="__main__":
@@ -90,7 +95,7 @@ if __name__=="__main__":
     print("Unique ID: 0x{:02x} ".format(int.from_bytes(data, "big")))
 
     while True:
-        data = db_meter.reg_read(db_meter.PCBARTISTS_DBM, db_meter.I2C_REG_DECIBEL)
-        print("Sound Level (dB SPL) = {:02d}".format(int.from_bytes(data, "big")))
+        sound_level = db_meter.read_sound_level()
+        print("Sound Level (dB SPL) = {:02d}".format(sound_level))
         utime.sleep (2)
     sys.exit()

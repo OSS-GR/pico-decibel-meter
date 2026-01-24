@@ -1,9 +1,11 @@
-from machine import Timer
 import time
 import random
+from machine import Timer
 from dbmeter import DBMeter
 from lcd import LCD_1inch69
 from touch import Touch_CST816D
+from arc_gauge import ArcGaugeRenderer
+from bar_gauge import BarGauge
 
 #Pin definition  引脚定义
 I2C_SDA = 6
@@ -37,23 +39,33 @@ class VolumeMeter:
         self.max_db = max_db
         self.current_db = 0
 
-        # Initialize arc gauge renderer
-        # Dimensions: 160x100 framebuffer, center at (80, 50)
-        # outer_radius: 45px, inner_radius: 35px (creates 10px thick arc)
+        # Initialize both gauge renderers
+        # Arc gauge
         self.arc_gauge = ArcGaugeRenderer(
             lcd,
-            width=160,
+            width=130,
             height=100,
             center_x=80,
             center_y=50,
-            outer_radius=45,
-            inner_radius=35
+            outer_radius=60,
+            inner_radius=30
         )
-        # Position gauge on display (centered horizontally)
         self.arc_gauge.set_display_position(
             (lcd.width - 160) // 2,  # Center horizontally
             90  # Y position below title
         )
+
+        # Bar gauge
+        self.bar_gauge = BarGauge(
+            lcd,
+            bar_width=200,
+            bar_height=30,
+            x=20,
+            y=120
+        )
+
+        # Mode tracking: True = arc, False = bar
+        self.use_arc_mode = False
         
     def get_color_for_db(self, db_value):
         """
@@ -73,112 +85,132 @@ class VolumeMeter:
         """Update the current decibel value"""
         self.current_db = db_value
         self.draw()
+
+    def toggle_mode(self):
+        """Toggle between bar and arc gauge modes"""
+        self.use_arc_mode = not self.use_arc_mode
+        mode_name = "Arc" if self.use_arc_mode else "Bar"
+        print(f"Switched to {mode_name} mode")
     
     def draw(self):
         """Draw the volume meter UI"""
         # Clear screen with white background
         self.lcd.fill(self.lcd.white)
-        
+
         # Title
-        self.lcd.write_text('Volume Level',25, 20, 2, self.lcd.black)
-        
-        # Calculate bar dimensions
-        bar_width = 200
-        bar_height = 30
-        bar_x = 20
-        bar_y = 120
-        
-        # Calculate fill amount based on current dB
+        self.lcd.write_text('Volume Level', 25, 20, 2, self.lcd.black)
+
+        # Calculate fill percentage based on current dB
         db_range = self.max_db - self.min_db
         fill_percent = (self.current_db - self.min_db) / db_range
-        fill_width = int(bar_width * fill_percent)
-        
+        # Clamp to 0-1 range
+        fill_percent = max(0.0, min(1.0, fill_percent))
+
         # Get color for current level
         bar_color = self.get_color_for_db(self.current_db)
-        
-        
-        # self.lcd.rect(bar_x, bar_y, bar_width, bar_height, self.lcd.black)
-        
-        # Draw filled portion
-        if fill_width > 0:
-            # Draw background bar (outline)
-            self.lcd.ellipse(round(self.lcd.width/2),bar_y, round(bar_width/2), round(bar_width/3), self.lcd.green, True, 3)
-            self.lcd.ellipse(round(self.lcd.width/2),bar_y+40, round(bar_width/2)-20, round(bar_width/3), self.lcd.white, True, 3)
-            # self.lcd.fill_rect(10, 55, fill_width, 75, self.lcd.black)
-            # self.lcd.fill_rect(bar_x, bar_y, fill_width, bar_height, bar_color)
 
-        
-        # Draw dB value as large text
+        # Render appropriate gauge based on mode
+        if self.use_arc_mode:
+            self.arc_gauge.blit_to_lcd(fill_percent, bar_color)
+        else:
+            self.bar_gauge.draw(fill_percent, bar_color)
+
+        # Draw dB value as large text (centered below gauge)
         db_text = str(int(self.current_db))
         self.lcd.write_text(db_text, 80, 180, 5, bar_color)
-        
+
         # Draw "dB" label
         self.lcd.write_text('dB', 170, 195, 3, self.lcd.black)
-        
+
         # Draw min/max range indicators
-        self.lcd.write_text(str(self.min_db), bar_x, bar_y + bar_height + 5, 2, self.lcd.black)
-        self.lcd.write_text(str(self.max_db), bar_width - 20 - bar_x, bar_y + bar_height + 5, 2, self.lcd.black)
-        
+        if self.use_arc_mode:
+            self.lcd.write_text(str(self.min_db), 20, 130, 2, self.lcd.black)
+            self.lcd.write_text(str(self.max_db), 230, 130, 2, self.lcd.black)
+        else:
+            self.lcd.write_text(str(self.min_db), 20, 155, 2, self.lcd.black)
+            self.lcd.write_text(str(self.max_db), 220, 155, 2, self.lcd.black)
+
         # Update display
         self.lcd.show()
 
-
-#Mock Data Generator  模拟数据生成器
-# class MockVolumeGenerator:
-#     def __init__(self, min_db=30, max_db=100):
-#         """
-#         Generate realistic mock decibel data
-        
-#         Args:
-#             min_db: Minimum dB value to generate
-#             max_db: Maximum dB value to generate
-#         """
-#         self.min_db = min_db
-#         self.max_db = max_db
-#         self.current_db = 55
-#         self.trend = 1  # 1 for increasing, -1 for decreasing
-        
-#     def get_next_value(self):
-#         """Generate next mock dB value with realistic variation"""
-#         # Small random walk for smooth transitions
-#         change = random.randint(-3, 3)
-#         self.current_db += change
-        
-#         # Ensure within bounds
-#         if self.current_db >= self.max_db:
-#             self.current_db = self.max_db
-#             self.trend = -1
-#         elif self.current_db <= self.min_db:
-#             self.current_db = self.min_db
-#             self.trend = 1
-        
-#         return self.current_db
   
 if __name__=='__main__':
     
-    LCD = LCD_1inch69()
-    LCD.set_bl_pwm(65535)
+    print("Starting Volume Meter...")
+    LCD = None
+    meter = None
+    db_meter = None
 
-    # Initialize volume meter UI
-    meter = VolumeMeter(LCD, min_db=0, max_db=100)
-    # generator = MockVolumeGenerator(min_db=20, max_db=100)
-    db_meter = DBMeter()
-    
-    # Timer callback to update mock data
+    try:
+        LCD = LCD_1inch69()
+        LCD.set_bl_pwm(65535)
+        print("LCD initialized")
+    except Exception as e:
+        print(f"LCD init failed: {e}")
+
+    if LCD:
+        try:
+            # Initialize volume meter UI
+            meter = VolumeMeter(LCD, min_db=0, max_db=100)
+            print("Volume Meter initialized")
+        except Exception as e:
+            print(f"VolumeMeter init failed: {e}")
+
+    try:
+        db_meter = DBMeter()
+        print("DBMeter initialized")
+    except Exception as e:
+        print(f"DBMeter init failed: {e}")
+
+    # Initialize touch controller (gesture mode)
+    touch = None
+    try:
+        print("Initializing touch...")
+        touch = Touch_CST816D()
+        print("Touch created")
+        touch.Set_Mode(0)  # 0 = gesture mode
+        print("Touch controller initialized")
+    except Exception as e:
+        print(f"Touch init failed: {e}")
+        print("Continuing without touch support")
+
+    if not (meter and db_meter and LCD):
+        print("ERROR: Failed to initialize required components")
+        import sys
+        sys.exit()
+
+    # Timer callback to update meter
     def update_meter(timer):
-        db_value = db_meter.get_current_db()
-        meter.update_decibel(db_value)
-    
+        start = time.ticks_ms()
+        sound_level = db_meter.read_sound_level()
+        meter.update_decibel(sound_level)
+        elapsed = time.ticks_ms() - start
+        if elapsed > 100:
+            print(f"Update took {elapsed}ms")
+
     # Create timer that triggers every 500ms (0.5 seconds)
-    timer = Timer()
+    timer = Timer(-1)
     timer.init(period=500, mode=Timer.PERIODIC, callback=update_meter)
-    
+    print("Starting main loop...")
+
     # Keep the program running
     try:
         while True:
-            time.sleep(1)
+            # Check for long press gesture (0x0C)
+            if touch and touch.Gestures == 0x0C:
+                meter.toggle_mode()
+                touch.Gestures = 0x00  # Reset gesture after handling
+                time.sleep(0.5)  # Debounce delay
+            time.sleep(0.1)
     except KeyboardInterrupt:
         timer.deinit()
-        # LCD.fill(LCD.white)
-        # LCD.show()
-        timer.init(period=500, mode=Timer.PERIODIC, callback=update_meter)
+        LCD.fill(LCD.white)
+        LCD.write_text(text="STOP",x=0,y=60,size=5,color=LCD.red)
+        LCD.show()
+        print("Keyboard Interrupt")
+    except Exception as e:
+        timer.deinit()
+        LCD.fill(LCD.white)
+        LCD.write_text(text="FAIL",x=0,y=60,size=5,color=LCD.red)
+        LCD.show()
+        print(f"Exception: {e}")
