@@ -127,7 +127,7 @@ class DBMeter():
                     "title": title or "Noise Alert",
                     # "sound": "minuet",
                     "badge": 1,
-                    "icon": "https://cdn-icons-png.flaticon.com/512/1320/1320548.png",
+                    "icon": "https://cdn-icons-png.flaticon.com/512/1320/1320548.png", # Red Siren Light
                     "group": "noise-alert",
                     # "url": "https://mritd.com"
                 })
