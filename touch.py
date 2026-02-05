@@ -3,8 +3,8 @@ import time
 
 
 #Pin definition  引脚定义
-I2C_SDA = 6
-I2C_SDL = 7
+I2C_SDA = 4  # Touch: I2C0 SDA on GP4
+I2C_SDL = 5  # Touch: I2C0 SCL on GP5
 I2C_IRQ = 17
 I2C_RST = 16
 
@@ -20,8 +20,8 @@ BL = 15
 #Touch drive  触摸驱动
 class Touch_CST816D(object):
     #Initialize the touch chip  初始化触摸芯片
-    def __init__(self,address=0x15,mode=0,i2c_num=1,i2c_sda=I2C_SDA,i2c_scl=I2C_SDL,irq_pin=I2C_IRQ,rst_pin=I2C_RST,LCD=None):
-        self._bus = I2C(id=i2c_num,scl=Pin(i2c_scl),sda=Pin(i2c_sda),freq=400_000) #Initialize I2C 初始化I2C
+    def __init__(self,address=0x15,mode=0,i2c_num=0,i2c_sda=I2C_SDA,i2c_scl=I2C_SDL,irq_pin=I2C_IRQ,rst_pin=I2C_RST,LCD=None):
+        self._bus = I2C(scl=Pin(i2c_scl),sda=Pin(i2c_sda),freq=400_000) #Initialize I2C 初始化I2C
         self._address = address #Set slave address  设置从机地址
         self.int=Pin(irq_pin,Pin.IN, Pin.PULL_UP)         
         self.rst=Pin(rst_pin,Pin.OUT)
@@ -40,6 +40,12 @@ class Touch_CST816D(object):
         self.Flag = self.Flgh =self.l = 0
         self.X_point = self.Y_point = 0
         self.int.irq(handler=self.Int_Callback,trigger=Pin.IRQ_FALLING)
+        if not LCD:
+            from lcd import LCD_1inch69
+            self.LCD = LCD_1inch69()
+            self.LCD.set_bl_pwm(65535)
+        else:
+            self.LCD = LCD
       
     def _read_byte(self,cmd):
         rec=self._bus.readfrom_mem(int(self._address),int(cmd),1)
@@ -105,16 +111,16 @@ class Touch_CST816D(object):
         self.Mode = 1
         self.Set_Mode(self.Mode)
         
-        LCD.fill(LCD.white)
-        LCD.rect(118,138,2,2,LCD.black)
-        LCD.show()
+        self.LCD.fill(self.LCD.white)
+        self.LCD.rect(118,138,2,2,self.LCD.black)
+        self.LCD.show()
         
         try:
             while True:              
                 if self.Flag == 1:  
-                    LCD.pixel(self.X_point,self.Y_point,color)
-                    LCD.rect(self.X_point - 1,self.Y_point - 1,2,2,color)
-                    LCD.Windows_show(x,y,self.X_point,self.Y_point)
+                    self.LCD.pixel(self.X_point,self.Y_point,color)
+                    self.LCD.rect(self.X_point - 1,self.Y_point - 1,2,2,color)
+                    self.LCD.Windows_show(x,y,self.X_point,self.Y_point)
 
         except KeyboardInterrupt:
             pass
@@ -123,40 +129,40 @@ class Touch_CST816D(object):
     def Touch_Gesture(self):
         self.Mode = 0
         self.Set_Mode(self.Mode)
-        LCD.write_text('Gesture test',70,90,1,LCD.black)
-        LCD.write_text('Complete as prompted',35,120,1,LCD.black)
-        LCD.show()
+        self.LCD.write_text('Gesture test',70,90,1,self.LCD.black)
+        self.LCD.write_text('Complete as prompted',35,120,1,self.LCD.black)
+        self.LCD.show()
         time.sleep(5)
-        LCD.fill(LCD.white)
+        self.LCD.fill(self.LCD.white)
         while self.Gestures != 0x02:
-            LCD.fill(LCD.red)
-            LCD.write_text('UP',100,110,3,LCD.black)
-            LCD.show()
+            self.LCD.fill(self.LCD.red)
+            self.LCD.write_text('UP',100,110,3,self.LCD.black)
+            self.LCD.show()
             
         while self.Gestures != 0x01:
-            LCD.fill(LCD.black)
-            LCD.write_text('DOWM',70,110,3,LCD.white)
-            LCD.show()
+            self.LCD.fill(self.LCD.black)
+            self.LCD.write_text('DOWM',70,110,3,self.LCD.white)
+            self.LCD.show()
             
         while self.Gestures != 0x03:
-            LCD.fill(LCD.blue)
-            LCD.write_text('LEFT',70,110,3,LCD.brown)
-            LCD.show()
+            self.LCD.fill(self.LCD.blue)
+            self.LCD.write_text('LEFT',70,110,3,self.LCD.brown)
+            self.LCD.show()
             
         while self.Gestures != 0x04:
-            LCD.fill(LCD.brown)
-            LCD.write_text('RIGHT',60,110,3,LCD.green)
-            LCD.show()
+            self.LCD.fill(self.LCD.brown)
+            self.LCD.write_text('RIGHT',60,110,3,self.LCD.green)
+            self.LCD.show()
             
         while self.Gestures != 0x0C:
-            LCD.fill(LCD.yellow)
-            LCD.write_text('Long Press',40,110,2,LCD.dark_red)
-            LCD.show()
+            self.LCD.fill(self.LCD.yellow)
+            self.LCD.write_text('Long Press',40,110,2,self.LCD.dark_red)
+            self.LCD.show()
             
         while self.Gestures != 0x0B:
-            LCD.fill(LCD.green)
-            LCD.write_text('Double Click',25,110,2,LCD.yellow)
-            LCD.show() 
+            self.LCD.fill(self.LCD.green)
+            self.LCD.write_text('Double Click',25,110,2,self.LCD.yellow)
+            self.LCD.show() 
         
     def Int_Callback(self,pin):
         if self.Mode == 0 :

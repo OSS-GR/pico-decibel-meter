@@ -6,8 +6,8 @@ from dbmeter import DBMeter
 
 
 #Pin definition  引脚定义
-I2C_SDA = 6
-I2C_SDL = 7
+I2C_SDA = 4  # Touch: I2C0 SDA on GP4
+I2C_SDL = 5  # Touch: I2C0 SCL on GP5
 I2C_IRQ = 17
 I2C_RST = 16
 
